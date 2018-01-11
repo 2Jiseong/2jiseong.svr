@@ -6,30 +6,18 @@ function trace(arg) {
 }
 
 // UI Element Value
-var input_offerDesc = document.querySelector('textarea#input_offerDesc');
-var output_answerDesc = document.querySelector('textarea#output_answerDesc');
-
 var vid1 = document.querySelector('#vid1');
 var vid2 = document.querySelector('#vid2');
-
 var btn_start = document.querySelector('#btn_start');
-var btn_receiveOffer = document.querySelector('#btn_receiveOffer');
-var btn_finalAnswer = document.querySelector('#btn_finalAnswer');
-var btn_test = document.querySelector('#btn_test');
+var roomId = document.querySelector('#room_id');
 
 btn_start.addEventListener('click', onStart);
-btn_receiveOffer.addEventListener('click', onReceiveOffer);
-btn_finalAnswer.addEventListener('click', onAnswer);
-btn_test.addEventListener('click', onTest);
 // ---------------------------------------------------------------------------------
-function onTest(){
-    g_mc_ws_component.sendMessage('test');
-}
-// ---------------------------------------------------------------------------------
-
 // Value
 var local_peer = null;
-var localstream;
+var localstream = null;
+var SIGNAL_SERVER_HTTP_URL = 'http://localhost:3001';
+var SIGNAL_SERVER_WS_URL = 'ws://jiseong-svr-express-2.herokuapp.com/signal';
 // ---------------------------------------------------------------------------------
 function cbGotStream(stream) {
     trace('Received local stream');
@@ -55,11 +43,27 @@ function cbGotRemoteStream(evt) {
 }
 
 function onWsMessage(messageEvt) {
-    receiveOffer(messageEvt.data);
+    console.info(messageEvt);
+
+    var obj = JSON.parse(messageEvt.data);
+    if (obj.code == '99') {
+        alert(obj.msg);
+    }
+    else if (obj.code == '01') {
+        // start
+        console.info('start in onWsMessage');
+    }
+    else if (obj.code == '00') {
+        receiveOffer(obj.msg);
+    }    
+    else {
+        alert('unknown error in onWsMessage');
+    }    
 }
 
 function onStart() {
-    g_mc_ws_component.connect(onWsMessage);
+    var url = SIGNAL_SERVER_WS_URL + '/room/' + roomId.value;
+    g_mc_ws_component.connect(url, onWsMessage);
 
     var cfg = {
         iceTransportPolicy: "all", // set to "relay" to force TURN.
@@ -85,16 +89,8 @@ function onStart() {
     trace('## start success = create RTCPeerConnection and set callback ');
 }
 
-function onReceiveOffer() {
-    var sdpString = input_offerDesc.value;
-    receiveOffer(sdpString);
-
-    trace('## receiveOffer success');
-}
-
 function onAnswer() {
     createAnswer();
-
     trace('## createAnswer success');
 }
 
@@ -116,11 +112,20 @@ function cbCreateProvisionalAnswerDescription(desc) {
     console.log('cbCreateProvisionalAnswerDescription');
     // Provisional answer, set a=inactive & set sdp type to pranswer.
     desc.sdp = desc.sdp.replace(/a=recvonly/g, 'a=inactive');
-    desc.type = 'pranswer';
+    desc.type = 'answer';
     local_peer.setLocalDescription(desc).then(
         cbSetLocalDescriptionSuccess,
         cbSetLocalDescriptionError
     );
+}
+
+function cbSetRemoteDescriptionSuccess() {
+    trace('cbSetRemoteDescriptionSuccess success.');
+    onAnswer();
+}
+
+function cbSetRemoteDescriptionError() {
+    trace('cbSetRemoteDescriptionError.');
 }
 
 function receiveOffer(sdpString) {
@@ -130,7 +135,10 @@ function receiveOffer(sdpString) {
         type: 'offer',
         sdp: sdpString
     };
-    local_peer.setRemoteDescription(descObject);
+    local_peer.setRemoteDescription(descObject).then(
+        cbSetRemoteDescriptionSuccess,
+        cbSetRemoteDescriptionError,
+    );    
 }
 
 function createAnswer() {
@@ -160,6 +168,25 @@ function onCheckIceCandidateAdded(candidateObject) {
 
 function onCheckIceCandidateCompleted(descObject) {
     trace('onCheckIceCandidateCompleted');
-    output_answerDesc.value = descObject.sdp;
-    g_mc_ws_component.sendMessage(output_answerDesc.value);
+    g_mc_ws_component.sendMessage(descObject.sdp);
 }
+
+var app = new Vue({
+    el: '#app',
+    data: {
+        rooms : [
+        ]
+    },
+    methods: {
+      onClickRoom : function (id) {
+        window.roomId.value = id;
+      },
+      onUpdateRoomList : function(event) {
+          this.$http.get(SIGNAL_SERVER_HTTP_URL + '/roomlist').then(response => {
+            this.rooms = response.body;
+          }, response => {
+            alert(response);
+          });          
+      }
+    }
+  })
