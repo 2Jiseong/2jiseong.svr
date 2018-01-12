@@ -8,16 +8,27 @@ function trace(arg) {
 // UI Element Value
 var vid1 = document.querySelector('#vid1');
 var vid2 = document.querySelector('#vid2');
+
 var btn_start = document.querySelector('#btn_start');
-var roomId = document.querySelector('#room_id');
+
+var input_message = document.querySelector('#message');
+var btn_send = document.querySelector('#btn_send');
+
+var roodId = document.querySelector('#room_id');
 
 btn_start.addEventListener('click', onStart);
+btn_send.addEventListener('click', onSend);
 // ---------------------------------------------------------------------------------
+function onSend(){
+    sendDataViaDataChannel(input_message.value);
+}
+// ---------------------------------------------------------------------------------
+
 // Value
 var local_peer = null;
-var localstream = null;
-var SIGNAL_SERVER_HTTP_URL = 'http://localhost:3001';
-var SIGNAL_SERVER_WS_URL = 'ws://localhost:3001';
+var localstream;
+
+var receiveChannel = null;
 // ---------------------------------------------------------------------------------
 function cbGotStream(stream) {
     trace('Received local stream');
@@ -62,8 +73,6 @@ function onWsMessage(messageEvt) {
 }
 
 function onStart() {
-    var url = SIGNAL_SERVER_WS_URL + '/room/' + roomId.value;
-    g_mc_ws_component.connect(url, onWsMessage);
 
     var cfg = {
         iceTransportPolicy: "all", // set to "relay" to force TURN.
@@ -71,13 +80,17 @@ function onStart() {
         ]
     };
     // cfg.iceServers.push({urls: "stun:stun.l.google.com:19302"});
+    // cfg.iceServers.push({
+    //     urls: "turn:webrtc.moberan.com",
+    //     username: "zoops", credential: "1234"
+    // });
 
-    local_peer = new RTCPeerConnection(cfg);    
+    local_peer = new RTCPeerConnection(cfg);
     local_peer.onicecandidate = function (evt) {
         cbIceCandidate(local_peer, evt);
     };
+    
     local_peer.ontrack = cbGotRemoteStream;
-
     localstream.getTracks().forEach(function (track) {
             local_peer.addTrack(
                 track,
@@ -85,12 +98,47 @@ function onStart() {
             );
         }
     );
+    
+    local_peer.ondatachannel = cbDtatChannel;
+
+    var url = 'ws://127.0.0.1:3001/room/' + roodId.value;
+    // var url = 'wss://zoops-webrtc-01.herokuapp.com/room/' + roodId.value;
+    g_mc_ws_component.connect(url, onWsMessage);
 
     trace('## start success = create RTCPeerConnection and set callback ');
 }
 
+function cbDtatChannel(event) {
+    try
+    {
+        console.info('ondatachannel');
+
+        receiveChannel = event.channel;
+        receiveChannel.onmessage = function(event){
+            console.info('receiveChannel.onmessage : ' + event.data);
+            document.querySelector("div#receive").innerHTML += '<br/>' + event.data;
+        };
+        receiveChannel.onopen  = cbChannelStateChange;
+        receiveChannel.onclose = cbChannelStateChange;
+    }catch (e) {
+        console.info(e);
+    }            
+};
+
+function cbChannelStateChange() {
+    var readyState = receiveChannel.readyState;
+    trace('receiveChannel state is: ' + readyState);
+}
+
+function sendDataViaDataChannel(data) {
+    receiveChannel.send(data);
+    document.querySelector("div#receive").innerHTML += '<br/>' + data;
+    trace('Sent Data: ' + data);
+}
+
 function onAnswer() {
     createAnswer();
+
     trace('## createAnswer success');
 }
 
@@ -111,8 +159,12 @@ function cbSetLocalDescriptionError(error) {
 function cbCreateProvisionalAnswerDescription(desc) {
     console.log('cbCreateProvisionalAnswerDescription');
     // Provisional answer, set a=inactive & set sdp type to pranswer.
+    // desc.sdp = desc.sdp.replace(/a=recvonly/g, 'a=inactive');
+    // desc.type = 'pranswer';
     desc.sdp = desc.sdp.replace(/a=recvonly/g, 'a=inactive');
-    desc.type = 'answer';
+    desc.sdp = desc.sdp.replace(/BUNDLE audio video/g, 'BUNDLE audio video data');
+    
+    console.log(desc);
     local_peer.setLocalDescription(desc).then(
         cbSetLocalDescriptionSuccess,
         cbSetLocalDescriptionError
@@ -121,6 +173,7 @@ function cbCreateProvisionalAnswerDescription(desc) {
 
 function cbSetRemoteDescriptionSuccess() {
     trace('cbSetRemoteDescriptionSuccess success.');
+
     onAnswer();
 }
 
@@ -142,6 +195,8 @@ function receiveOffer(sdpString) {
 }
 
 function createAnswer() {
+
+    
     local_peer.createAnswer().then(
         cbCreateProvisionalAnswerDescription,
         cbCreateAnswerError
@@ -170,23 +225,3 @@ function onCheckIceCandidateCompleted(descObject) {
     trace('onCheckIceCandidateCompleted');
     g_mc_ws_component.sendMessage(descObject.sdp);
 }
-
-var app = new Vue({
-    el: '#app',
-    data: {
-        rooms : [
-        ]
-    },
-    methods: {
-      onClickRoom : function (id) {
-        window.roomId.value = id;
-      },
-      onUpdateRoomList : function(event) {
-          this.$http.get(SIGNAL_SERVER_HTTP_URL + '/roomlist').then(response => {
-            this.rooms = response.body;
-          }, response => {
-            alert(response);
-          });          
-      }
-    }
-  })
