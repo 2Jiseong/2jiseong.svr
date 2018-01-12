@@ -129,7 +129,7 @@ function cbChannelStateChange() {
 }
 
 function sendDataViaDataChannel(data) {
-    sendChannel.send(data);
+    url.send(data);
     document.querySelector("div#receive").innerHTML += '<br/>' + data;
     trace('Sent Data: ' + data);
 }
@@ -156,7 +156,7 @@ function receiveAnswer(sdpString) {
         type: 'answer',
         sdp: sdpString
     };
-    local_peer.setRemoteDescription(descObject);
+    url.setRemoteDescription(descObject);
 }
 
 function cbCreateOfferError(error) {
