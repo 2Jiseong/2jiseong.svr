@@ -101,7 +101,7 @@ function onStart() {
     
     local_peer.ondatachannel = cbDtatChannel;
 
-    var url = 'ws://jiseong-svr-express-2.herokuapp.com/room/' + roodId.value;
+    var url = 'wss://jiseong-svr-express-2.herokuapp.com/room/' + roodId.value;
     // var url = 'wss://zoops-webrtc-01.herokuapp.com/room/' + roodId.value;
     g_mc_ws_component.connect(url, onWsMessage);
 
