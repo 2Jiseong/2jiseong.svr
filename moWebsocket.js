@@ -1,7 +1,7 @@
 var g_mc_ws_component = {
     ws: null,
     // url: 'wss://zoops-webrtc-01.herokuapp.com/echo',
-    url: 'ws://jiseong-svr-express-2.herokuapp.com/signal',
+    url: 'wss://jiseong-svr-express-2.herokuapp.com/signal',
     init: function () {
 
     },
