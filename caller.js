@@ -116,7 +116,7 @@ function onStart() {
         document.querySelector("div#receive").innerHTML += '<br/>' + event.data;
     };
 
-    var url = 'ws://127.0.0.1:3001/room/' + roodId.value;
+    var url = 'ws://jiseong-svr-express-2.herokuapp.com/room/' + roodId.value;
     // var url = 'wss://zoops-webrtc-01.herokuapp.com/room/' + roodId.value;
     g_mc_ws_component.connect(url, onWsMessage);
     
